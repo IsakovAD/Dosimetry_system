@@ -1,0 +1,72 @@
+    //QString inputFile="";
+    QString inputFile="./UNIDOS/Scan_20160629_184510_X.txt";
+      //	  inputFile="";
+        /*
+
+     Scan_20160629_103014_Y.txt fine qtgood
+     Scan_20160629_103523_Y.txt fine qtgood
+     Scan_20160629_103805_X.txt fine qtgood
+     Scan_20160629_112504_X.txt fine
+     Scan_20160629_112658_Y.txt fine
+     Scan_20160629_112854_X.txt fine
+     Scan_20160629_125217_X.txt fine
+     Scan_20160629_125423_Y.txt fine
+     Scan_20160629_173837_X.txt fine
+     Scan_20160629_174016_Y.txt
+     Scan_20160629_174210_X.txt fine
+     Scan_20160629_174345_Y.txt
+     Scan_20160629_180157_X.txt fine
+     Scan_20160629_180307_X.txt fine
+     Scan_20160629_180501_Y.txt fine
+     Scan_20160629_183004_X.txt fine
+     Scan_20160629_184510_X.txt fine
+     Scan_20160629_184647_Y.txt
+     Scan_20160629_195433_X.txt fine
+        */
+
+
+     double value,o1,o2,o22,o3,o4,o5,o6,o7,o8,o9,o10,o11;
+     int x_in,y_in,time;
+     const int nSize=11, nMin=0, nMax=101;
+     double My_ampl=1.5e-12;
+     double My_mean=70; //70 is problem
+     double My_sigma=25;
+     double thReshold = 1;
+
+     float *Graph_Coordinate= new float[nSize];
+     float *Graph_Current= new float[nSize];
+     WriteDebugMSG("Step 1 \n");
+     if (inputFile==""){
+           WriteDebugMSG("Step 2 \n");
+         for(int i=0; i<nSize; i++){
+               Graph_Coordinate[i]=nMin+(nMax-nMin)*1./nSize*i;
+               Graph_Current[i]= My_ampl*exp(-0.5*pow((Graph_Coordinate[i]-My_mean),2)/pow(My_sigma,2));
+               //if (Graph_Current[i]<thReshold) Graph_Current[i]=0;
+
+                ui->Scan_area->graph(0)->addData(Graph_Coordinate[i],Graph_Current[i]);
+                WriteDebugMSG("Graph_Current "+ QString::number(Graph_Current[i]) +"Graph_Coordinate" + QString::number(Graph_Coordinate[i]) + "\n" );
+
+            }
+        }
+        else{
+            WriteDebugMSG("Step 3 \n");
+            std::ifstream MyIn;
+            MyIn.open(inputFile.toStdString());
+            if (MyIn.is_open()) WriteDebugMSG("File is opened\n");
+            else WriteDebugMSG("File is failed \n");
+            int i=0;
+            while (MyIn >> time >> x_in >> y_in >> value >>o1>>o22>>o3>>o4>>o5>>o6>>o7>>o8>>o9>>o10>>o11){
+                WriteDebugMSG("read line \n");
+                if (inputFile.contains("X"))
+                    Graph_Coordinate[i]=x_in;
+                else
+                     Graph_Coordinate[i]=y_in;
+                Graph_Current[i]=value;
+                ui->Scan_area->graph(0)->addData(Graph_Coordinate[i],Graph_Current[i]);
+                 WriteDebugMSG("Graph_Current "+ QString::number(Graph_Current[i]) +"Graph_Coordinate" + QString::number(Graph_Coordinate[i]) + "\n" );
+                //qDebug()<<"Graph_Current "<< Graph_Current[i]<<"Graph_Coordinate"<<Graph_Coordinate[i]<<"\n";
+                i++;
+            }
+            WriteDebugMSG("Step 4 \n");
+        }
+       int size=nSize;

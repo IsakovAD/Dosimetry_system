@@ -12,6 +12,7 @@
 #include <QThread>
 #include <QTime>
 #include <QTimer>
+#include <fstream>
 //#include <settingdialog.h>
 
 float Les_sqrt (float*,float*,float,float,float,int);

@@ -3,6 +3,8 @@
 #include <QtSerialPort/QSerialPort>
 #include <QtSerialPort/QSerialPortInfo>
 #include <iostream>
+#include <fstream>
+#include <stdio.h>
 #include "QTime"
 #include "settingdialog.h"
 #include "qmessagebox"
@@ -40,7 +42,7 @@ ui->checkBox_ReadyX->setEnabled(false);
 ui->checkBox_ReadyY->setEnabled(false);
 
 //parameters for calculation dose
-
+limit_range_random=20; //AID 06_05
 CalibrationConstant=0;
 pEnergyAtSample=0;
 LET=0;
@@ -164,8 +166,8 @@ ui->label_Sil_dose->setText("Dose in silicon  [krad]  "+ QString::number(0) );
 
 
 ui->Info_label_1->setAlignment(Qt::AlignCenter);
-ui->Info_label_1->setText("k [pA^-1 cm^-2 s^-1]=    " + QString::number(CalibrationConstant) +  "\n  E of p hitting sample [MeV]=   " + QString::number(pEnergyAtSample) +   " \n LET in Si [MeV/ (mg/cm2)]=    " + QString::number(LET));
-
+ui->Info_label_1->setText("k [pA^-1 cm^-2 s^-1]=    " + QString::number(CalibrationConstant) +  "\n  E of p hitting sample [MeV]=   " + QString::number(pEnergyAtSample) +   " \n LET in Si [MeV/ (mg/cm2)]=    ");
+ui->doubleSpinBox_LET->setValue(LET);
 ui->Info_label_2->setAlignment(Qt::AlignCenter);
 ui->Info_label_2->setText("Gaus Amplitude [nA] " + QString::number(expected_amp) +  "\n \n Gaus Mean [mm] " + QString::number(expected_mean)+ "\n \n Gaus Sigma [mm] " + QString::number(expected_sigma) +  "\n \n Scale (approx.) " + QString::number(GausScale));
 
@@ -394,14 +396,9 @@ thread_New4->start();
      connect(COM_DEGRADER,SIGNAL(ErrorInOpenPort(QString)),settings,SLOT(ErrorInOpening(QString)));
 
 
-     // ui->textBrowser->setText("I \r AM \r error! \r");
-
-
 //     initActionsConnections();
 
-QString test1="  5e-014";
-     WriteDebugMSG("String"+ test1 +" number:  "+ QString::number(test1.toDouble()));
-     //qDebug()<<"Test1: "<< test1.toDouble() <<" Test2: "<< test2.toDouble()<<"Test3: "<< test3.toDouble() <<" Test4: "<< test4.toDouble();
+
 }
 
 
@@ -443,149 +440,107 @@ void MainWindow:: FitGaus(){
     float max=0,temp=0;
     int max_coordinate;
     const QCPDataMap *dataMap= ui->Scan_area->graph(0)->data();
-    if (dataMap->empty())
-    {
+
+
+    if (dataMap->empty()){
         WriteDebugMSG("No Scan found");
         return;
-
     }
-    QMap<double,QCPData>::const_iterator i=dataMap->constBegin();
 
+    QMap<double,QCPData>::const_iterator i=dataMap->constBegin();
     int size =dataMap->size(),j=0;
-//qDebug()<<"SIZE OF MAS is "<<size;
 
     float *Graph_Coordinate= new float[size];
     float *Graph_Current= new float[size];
-
-    for (i=dataMap->constBegin();i!=dataMap->constEnd();i++)
-    {
+    for (i=dataMap->constBegin();i!=dataMap->constEnd();i++){
           Graph_Current[j] = i.value().value ;
           Graph_Coordinate[j] = i.value().key ;
-        //  qDebug()<<"Graph_Current "<< Graph_Current[j]<<"Graph_Coordinate"<<Graph_Coordinate[j];
           j++;
-
     }
 
 
-
-
-
-    qsrand(QDateTime::currentMSecsSinceEpoch() );
+    qsrand(QDateTime::currentMSecsSinceEpoch());
     float fit_ampl[8]={18,19,20,20,0,0,0,0};
-       float fit_mean[8]={48,50,52,49,0,0,0,0};
-       float fit_sigma[8]={40,50,45,55,0,0,0,0};
-
-    if (limit_range_random==20)   //aid 6Feb_2020
-                                {
+    float fit_mean[8]={48,50,52,49,0,0,0,0};
+    float fit_sigma[8]={40,50,45,55,0,0,0,0};
 
 
+    if (limit_range_random==20){
 
-                                    for (int i=0;i<size;i++)
-                                    {
-
-                                       if (Graph_Current[i]>max)
-                                       {
-                                          max= Graph_Current[i];
-                                          max_coordinate=i;
-                                        //  qDebug()<<"MAX IS changed "<<max<<" coordinate "<<max_coordinate;
-                                       }
-                                    }
-
-                                    expected_amp=Graph_Current[max_coordinate];
-                                    expected_mean=Graph_Coordinate[max_coordinate];
-
-
-                                    for (int i=0;i<size;i++)
-                                        {
-                                          if (Graph_Current[i]>=max/2. && temp==0)
-                                          {
-                                                        temp=Graph_Coordinate[i];
-                                                    qDebug()<<"Start"<<Graph_Coordinate[i];
-                                          }
-                                            if ((Graph_Current[i]<=max/2.) && (temp!=0))
-                                                        {
-                                                            expected_sigma=(Graph_Coordinate[i]-temp)/2.355;
-                                                             qDebug()<<"Endr  rr" <<Graph_Coordinate[i];
-                                                            break;
-
-                                                        };
-                                        }
-                                     qDebug()<<"Expected Sigma<< "<<expected_sigma;
-                                    if (expected_sigma == 0) expected_sigma=(Graph_Coordinate[size-1]-Graph_Coordinate[0])/2.355;
-
-                                   // qDebug()<<"End"<<Graph_Coordinate[size-1]<<"Begin"<<Graph_Coordinate[0];
-                                     // expected_sigma=2.50662827463*expected_amp;s
-
-                                    qDebug()<<"Expected Sigma<< "<<expected_sigma<< " amp "<<expected_amp<<" mean "<<expected_mean;
-
-                                }
-
-        for (int i=0;i<4;i++)
-        {
-/*
-            fit_ampl[i]=expected_amp+((qrand() % limit_range_random -(int) limit_range_random/2));
-            fit_sigma[i]=expected_sigma+((qrand() % limit_range_random -(int) limit_range_random/2));s
-            fit_mean[i]=expected_mean+((qrand() % limit_range_random -(int) limit_range_random/2));
-*/
-/*
-            fit_ampl[i]=expected_amp+expected_amp*((qrand() % limit_range_random -(int) limit_range_random/2))/(1000 + (6-limit_range_random)*100);
-                       fit_sigma[i]=expected_sigma+expected_sigma*((qrand() % limit_range_random -(int) limit_range_random/2))/(1000 + (6-limit_range_random)*100);
-                       fit_mean[i]=expected_mean+expected_mean*((qrand() % limit_range_random -(int) limit_range_random/2))/(1000 + (6-limit_range_random)*100);
-*/
-
-/*  //Problems with convergence, need to find another limits
-            fit_ampl[i]=expected_amp+expected_amp*((qrand() % limit_range_random -(int) limit_range_random/2 +0.5))/(100 + (6-limit_range_random)*10);
-                       fit_sigma[i]=expected_sigma+expected_sigma*((qrand() % limit_range_random -(int) limit_range_random/2 +0.5))/(100 + (6-limit_range_random)*10);
-                       fit_mean[i]=expected_mean+expected_mean*((qrand() % limit_range_random -(int) limit_range_random/2 +0.5))/(100 + (6-limit_range_random)*10);
-*/
-
-            //aid 6Feb_2020
-            fit_ampl[i]=expected_amp+expected_amp*((qrand() % limit_range_random -(int) limit_range_random/2))/100;
-                       fit_sigma[i]=expected_sigma+expected_sigma*((qrand() % limit_range_random -(int) limit_range_random/2))/100;
-                       fit_mean[i]=expected_mean+expected_mean*((qrand() % limit_range_random -(int) limit_range_random/2))/100;
-
-
-
-
-           qDebug()<<"i="<<i<<" Sigma<< "<<fit_sigma[i]<< " amp "<<fit_ampl[i]<<" mean "<<fit_mean[i];
-           // qDebug("Random number is ");
-           // qDebug()<<((qrand() % limit_range_random -(int) limit_range_random/2))/2;
+     // First predictions of parameters, "limit_range_random==20" means that we first time here
+        for (int i=0;i<size;i++){
+            if (Graph_Current[i]>max){
+                max= Graph_Current[i];
+                max_coordinate=i;
+            }
         }
+        ScanArea_Max=max; //AID 06_05 DELETE THIS LATER
+
+        expected_amp=Graph_Current[max_coordinate];
+        expected_mean=Graph_Coordinate[max_coordinate];
+
+        float first=Graph_Coordinate[0];
+        float second=Graph_Coordinate[size-1];
+        int flag=0;
+        for(int i=0;i<size;i++){
+            if(Graph_Current[i]>=max/2. && flag==0){
+                first=Graph_Coordinate[i];
+                flag=1;
+                continue;
+            }
+            if( Graph_Current[i]<=max/2. && flag==1){
+                second=Graph_Coordinate[i];
+                break;
+            }
+       }
+
+       expected_sigma=(second-first)/2.355;
+       //WriteDebugMSG("Expected Sigma "+ QString::number(expected_sigma)+ " amp "+ QString::number(expected_amp)+" mean "+ QString::number(expected_mean) );
+
+    }
+
+     //we need to have 4 random values of parameters. amplitude is always fixed
+     for (int i=0;i<4;i++){
+         int sign_mean;
+         int sign_sigma;
+
+         if (i%2==1) sign_mean=1;
+         else sign_mean=-1;
+
+         if (i<2) sign_sigma=1;
+         else sign_sigma=-1;
+
+
+         fit_ampl[i]=expected_amp;
+
+         fit_sigma[i]=expected_sigma  + sign_mean* fabs(expected_sigma*((qrand() % limit_range_random -(int) limit_range_random/2))/100);
+         fit_mean[i]=expected_mean  +  sign_sigma* fabs(expected_mean*((qrand() % limit_range_random -(int) limit_range_random/2))/100);
+
+         //WriteDebugMSG("RandomUpdates: fit_sigma[i]: "+ QString::number(fit_sigma[i]-expected_sigma) + " fit_mean "+QString::number(fit_mean[i]-expected_mean) +"\n"  );
+
+     }
 
     if (limit_range_random>10) limit_range_random--;  //aid 6Feb_2020
+    float k=0, e=0.01, alpha=1, beta=0.5, gamma=2.9,sum=0;
 
+    while (k<50){
+        for (int i=0;i<4;i++){
+            for (int j=0;j<3;j++){
+                if (Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[j],fit_mean[j],fit_sigma[j],size)<Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[j+1],fit_mean[j+1],fit_sigma[j+1],size)){
+                    temp=fit_ampl[j];
+                    fit_ampl[j]=fit_ampl[j+1];
+                    fit_ampl[j+1]=temp;
 
+                    temp=fit_sigma[j];
+                    fit_sigma[j]=fit_sigma[j+1];
+                    fit_sigma[j+1]=temp;
 
-
-       float k=0, e=0.01, alpha=1, beta=0.5, gamma=2.9,sum=0;
-
-
-
-       while (k<50)
-    {
-          for (int i=0;i<4;i++)
-          {
-              for (int j=0;j<3;j++)
-              {
-                  if (Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[j],fit_mean[j],fit_sigma[j],size)<Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[j+1],fit_mean[j+1],fit_sigma[j+1],size))
-                    {
-
-                      temp=fit_ampl[j];
-                      fit_ampl[j]=fit_ampl[j+1];
-                      fit_ampl[j+1]=temp;
-
-                      temp=fit_sigma[j];
-                      fit_sigma[j]=fit_sigma[j+1];
-                      fit_sigma[j+1]=temp;
-
-                      temp=fit_mean[j];
-                      fit_mean[j]=fit_mean[j+1];
-                      fit_mean[j+1]=temp;
-
-                    }
+                    temp=fit_mean[j];
+                    fit_mean[j]=fit_mean[j+1];
+                    fit_mean[j+1]=temp;
+                 }
               }
-          }
-
+         }
      //     4 - best, 1 - worst
      //    find center of mass
 
@@ -593,166 +548,117 @@ void MainWindow:: FitGaus(){
     fit_sigma[4]=0;
     fit_mean[4]=0;
 
-        for (int i=1;i<4;i++) //all without wrost one
-            {
-              fit_ampl[4]+=fit_ampl[i];
-              fit_sigma[4]+=fit_sigma[i];
-              fit_mean[4]+=fit_mean[i];
+    for (int i=1;i<4;i++){ //all without wrost one
+        fit_ampl[4]+=fit_ampl[i];
+        fit_sigma[4]+=fit_sigma[i];
+        fit_mean[4]+=fit_mean[i];
+    }
 
-            }
-       fit_ampl[4]/=3;
-       fit_sigma[4]/=3;
-       fit_mean[4]/=3;
-
+    fit_ampl[4]/=3;
+    fit_sigma[4]/=3;
+    fit_mean[4]/=3;
 
     sum=0;
-       for (int i=0;i<4;i++)
-       {
-           sum+= pow((Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[i],fit_mean[i],fit_sigma[i],size) - Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[4],fit_mean[4],fit_sigma[4],size)),2);
-       }
+    for (int i=0;i<4;i++){
+        sum+= pow((Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[i],fit_mean[i],fit_sigma[i],size) - Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[4],fit_mean[4],fit_sigma[4],size)),2);
+    }
     sum=sqrt(sum)/4;
 
+    if (sum<=e){
+        break;
+    }
+    // reflection
 
-        if (sum<=e)
-            {
-                break;
-            }
-
-
-      // reflection
-
-        fit_ampl[5]=fit_ampl[4] + alpha*(fit_ampl[4]-fit_ampl[0]);
-        fit_sigma[5]=fit_sigma[4] + alpha*(fit_sigma[4]-fit_sigma[0]);
-        fit_mean[5]=fit_mean[4] + alpha*(fit_mean[4]-fit_mean[0]);
+    fit_ampl[5]=fit_ampl[4] + alpha*(fit_ampl[4]-fit_ampl[0]);
+    fit_sigma[5]=fit_sigma[4] + alpha*(fit_sigma[4]-fit_sigma[0]);
+    fit_mean[5]=fit_mean[4] + alpha*(fit_mean[4]-fit_mean[0]);
 
 
+    if (Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[5],fit_mean[5],fit_sigma[5],size)<=Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[3],fit_mean[3],fit_sigma[3],size)){
 
-
-      if (Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[5],fit_mean[5],fit_sigma[5],size)<=Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[3],fit_mean[3],fit_sigma[3],size))
-      {
-
-          fit_ampl[6]=fit_ampl[4] + gamma*(fit_ampl[5]-fit_ampl[4]);
-          fit_sigma[6]=fit_sigma[4] + gamma*(fit_sigma[5]-fit_sigma[4]);
-          fit_mean[6]=fit_mean[4] + gamma*(fit_mean[5]-fit_mean[4]);
-
-
-           if (Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[6],fit_mean[6],fit_sigma[6],size)<Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[3],fit_mean[3],fit_sigma[3],size))
-                   {
-
-                        fit_ampl[0]=fit_ampl[6];
-                        fit_sigma[0]=fit_sigma[6];
-                        fit_mean[0]=fit_mean[6];
-                   }
-          else
-                {
-                        fit_ampl[0]=fit_ampl[5];
-                        fit_sigma[0]=fit_sigma[5];
-                        fit_mean[0]=fit_mean[5];
-                 }
-          k++;
-           continue;
-      }
-
-
-      if ((Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[2],fit_mean[2],fit_sigma[2],size)<Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[5],fit_mean[5],fit_sigma[5],size)) && (Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[5],fit_mean[5],fit_sigma[5],size)<=Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[0],fit_mean[0],fit_sigma[0],size)))
-              {
-                    fit_ampl[7]=fit_ampl[4] + beta*(fit_ampl[0]-fit_ampl[4]) ;
-                    fit_sigma[7]=fit_sigma[4] + beta*(fit_sigma[0]-fit_sigma[4]);
-                    fit_mean[7]=fit_mean[4] + beta*(fit_mean[0]-fit_mean[4]);
-
-
-                   fit_ampl[0]=fit_ampl[7];
-                   fit_sigma[0]=fit_sigma[7];
-                   fit_mean[0]=fit_mean[7];
-                   k++;
-
-                   continue;
-              }
-
-
-      if ((Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[3],fit_mean[3],fit_sigma[3],size)<Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[5],fit_mean[5],fit_sigma[5],size)) && (Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[5],fit_mean[5],fit_sigma[5],size)<=Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[2],fit_mean[2],fit_sigma[2],size)))
-              {
-
-                   fit_ampl[0]=fit_ampl[5];
-                   fit_sigma[0]=fit_sigma[5];
-                   fit_mean[0]=fit_mean[5];
-                   k++;
-                   continue;
-              }
-
-      if (Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[5],fit_mean[5],fit_sigma[5],size)>Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[0],fit_mean[0],fit_sigma[0],size))
-              {
-                    for (int i=0;i<4;i++)
-                    {
-                        fit_ampl[i]=fit_ampl[3]+0.5*(fit_ampl[i]-fit_ampl[3]);
-                        fit_sigma[i]=fit_sigma[3]+0.5*(fit_sigma[i]-fit_sigma[3]);
-                        fit_mean[i]=fit_mean[3]+0.5*(fit_mean[i]-fit_mean[3]);
-
-                    }
-
-                    k++;
-                    continue;
-              }
-              k++;
-
-
+        fit_ampl[6]=fit_ampl[4] + gamma*(fit_ampl[5]-fit_ampl[4]);
+        fit_sigma[6]=fit_sigma[4] + gamma*(fit_sigma[5]-fit_sigma[4]);
+        fit_mean[6]=fit_mean[4] + gamma*(fit_mean[5]-fit_mean[4]);
+           if (Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[6],fit_mean[6],fit_sigma[6],size)<Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[3],fit_mean[3],fit_sigma[3],size)){
+               fit_ampl[0]=fit_ampl[6];
+               fit_sigma[0]=fit_sigma[6];
+               fit_mean[0]=fit_mean[6];
+           }else{
+               fit_ampl[0]=fit_ampl[5];
+               fit_sigma[0]=fit_sigma[5];
+               fit_mean[0]=fit_mean[5];
+           }
+         k++;
+         continue;
      }
 
 
-//qDebug()<<"Exit from Fit sum="<<sum<<" k= "<<k;
-       ui->Scan_area->axisRect()->setupFullAxesBox();
+      if ((Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[2],fit_mean[2],fit_sigma[2],size)<Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[5],fit_mean[5],fit_sigma[5],size)) && (Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[5],fit_mean[5],fit_sigma[5],size)<=Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[0],fit_mean[0],fit_sigma[0],size))){
+          fit_ampl[7]=fit_ampl[4] + beta*(fit_ampl[0]-fit_ampl[4]) ;
+          fit_sigma[7]=fit_sigma[4] + beta*(fit_sigma[0]-fit_sigma[4]);
+          fit_mean[7]=fit_mean[4] + beta*(fit_mean[0]-fit_mean[4]);
+
+          fit_ampl[0]=fit_ampl[7];
+          fit_sigma[0]=fit_sigma[7];
+          fit_mean[0]=fit_mean[7];
+          k++;
+          continue;
+      }
+
+
+      if ((Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[3],fit_mean[3],fit_sigma[3],size)<Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[5],fit_mean[5],fit_sigma[5],size)) && (Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[5],fit_mean[5],fit_sigma[5],size)<=Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[2],fit_mean[2],fit_sigma[2],size))){
+          fit_ampl[0]=fit_ampl[5];
+          fit_sigma[0]=fit_sigma[5];
+          fit_mean[0]=fit_mean[5];
+          k++;
+          continue;
+      }
+
+      if (Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[5],fit_mean[5],fit_sigma[5],size)>Les_sqrt(Graph_Coordinate,Graph_Current,fit_ampl[0],fit_mean[0],fit_sigma[0],size)){
+          for (int i=0;i<4;i++){
+              fit_ampl[i]=fit_ampl[3]+0.5*(fit_ampl[i]-fit_ampl[3]);
+              fit_sigma[i]=fit_sigma[3]+0.5*(fit_sigma[i]-fit_sigma[3]);
+              fit_mean[i]=fit_mean[3]+0.5*(fit_mean[i]-fit_mean[3]);
+           }
+           k++;
+           continue;
+      }
+      k++;
+
+
+   }
+
+    ui->Scan_area->axisRect()->setupFullAxesBox();
+    expected_amp=fit_ampl[4];
+    expected_sigma=fit_sigma[4];
+    expected_mean=fit_mean[4];
+
+    //WriteDebugMSG("Results Expected Sigma "+ QString::number(expected_sigma)+ " amp "+ QString::number(expected_amp)+" mean "+ QString::number(expected_mean) );
 
 
 
-    //   ui->Scan_area->graph(0)->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssDisc , 8));
-    //   ui->Scan_area->graph(0)->setPen(QPen(QColor(Qt::red))); // Устанавливаем цвет графика
-
-
-
-        expected_amp=fit_ampl[4];
-        expected_sigma=fit_sigma[4];
-        expected_mean=fit_mean[4];
-
-
-//qDebug()<<"Expected valuers"<< expected_sigma<< "fit_sigma[i]"<< expected_amp<< "<<fit_ampl[i]"<< expected_mean<< "fit_mean[i]";
-
-if (ui->AxisX_Button->isChecked())
+    if (ui->AxisX_Button->isChecked())
         GausScale=fit_ampl[4]*exp(-0.5*pow((ui->spinBox_HereX->value()-fit_mean[4]),2)/pow(fit_sigma[4],2)) / (fit_ampl[4]*exp(-0.5*pow((ui->spinBox_MoveX->value()-fit_mean[4]),2)/pow(fit_sigma[4],2)));
-else
+    else
         GausScale=fit_ampl[4]*exp(-0.5*pow((ui->spinBox_HereY->value()-fit_mean[4]),2)/pow(fit_sigma[4],2)) / (fit_ampl[4]*exp(-0.5*pow((ui->spinBox_MoveY->value()-fit_mean[4]),2)/pow(fit_sigma[4],2)));
 
-
-ui->Info_label_2->setText("Gaus Amplitude [nA] " + QString::number(expected_amp) +  "\n \n Gaus Mean [mm] " + QString::number(expected_mean)+ "\n \n Gaus Sigma [mm] " + QString::number(expected_sigma) +  "\n \n Scale (approx.) " + QString::number(GausScale));
-
+    ui->Info_label_2->setText("Gaus Amplitude [nA] " + QString::number(expected_amp) +  "\n \n Gaus Mean [mm] " + QString::number(expected_mean)+ "\n \n Gaus Sigma [mm] " + QString::number(expected_sigma) +  "\n \n Scale (approx.) " + QString::number(GausScale));
     float step = (ui->spinBox_ScanMax->value() -  ui->spinBox_ScanMin->value())/100.;
 
     qDebug()<<"Step"<< step;
     qDebug()<<" MAX: "<<ui->spinBox_ScanMax->value() <<" MIN: "<<ui->spinBox_ScanMin->value();
-    // qDebug()<<"Step"<< step;
 
-   float coordinate=ui->spinBox_ScanMin->value();
+    float coordinate=ui->spinBox_ScanMin->value();
     ui->Scan_area->graph(1)->setPen(QPen(QColor(Qt::red)));
-
-  ui->Scan_area->graph(1)->clearData();
-  qDebug("Im plotting!");
-    for (int i=1;i<100;i++)
-    {
-
-         ui->Scan_area->graph(1)->addData(coordinate,fit_ampl[4]*exp(-0.5*pow((coordinate-fit_mean[4]),2)/pow(fit_sigma[4],2)));
+    ui->Scan_area->graph(1)->clearData();
+    qDebug("Im plotting!");
+    for (int i=1;i<100;i++){
+        ui->Scan_area->graph(1)->addData(coordinate,fit_ampl[4]*exp(-0.5*pow((coordinate-fit_mean[4]),2)/pow(fit_sigma[4],2)));
         coordinate+=step;
-       // qDebug()<<"Coord X:"<<coordinate << " "<< " Current: "<< fit_ampl[4]*exp(-0.5*pow((coordinate-fit_mean[4]),2)/pow(fit_sigma[4],2));
-
-
     }
-    ui->Scan_area->graph(1)->setAntialiased(false);         // Отключаем сглаживание, по умолчанию включено
-
+    ui->Scan_area->graph(1)->setAntialiased(false);         // Dummy solution to avoid additional points for the scan plot
 
     Draw_Scan_area();
-
-
-
-
-
 
 }
 
@@ -1064,8 +970,8 @@ void MainWindow:: CalcBeamParams (void){
   }
       //LET= Linear_interplotation(pEnergyAtSample);
       //LET = 0.018;
-      ui->Info_label_1->setText("k [pA^-1 cm^-2 s^-1]=    " + QString::number(CalibrationConstant) +  "\n E of p hitting sample [MeV]=   " + QString::number(pEnergyAtSample) +   " \n LET in Si [MeV/ (mg/cm2)]=    " + QString::number(LET));
-
+      ui->Info_label_1->setText("k [pA^-1 cm^-2 s^-1]=    " + QString::number(CalibrationConstant) +  "\n E of p hitting sample [MeV]=   " + QString::number(pEnergyAtSample) +   " \n LET in Si [MeV/ (mg/cm2)]=    ");
+      ui->doubleSpinBox_LET->setValue(LET);
 
 }
 
@@ -1225,7 +1131,7 @@ void MainWindow:: WriteLogFile(){
         {
               if (WaitTimer->remainingTime() ==0)
                 {
-                  WriteDebugMSG("Too long wait UNIDOS");
+                  WriteDebugMSG("Too long wait UNIDOS \n");
                   return;
                 }
 
@@ -1242,7 +1148,7 @@ void MainWindow:: WriteLogFile(){
 
 
 CurrentUpdated=0;
-//qDebug("Draw Monitoring area");
+//qDebug("Draw Monitoring area \n");
 Draw_Monitoring_area();
 
     timer->start(ui->spinBox_Period->value()*1000);
@@ -1295,7 +1201,7 @@ if (flux<0) flux=0;
 if (ui->BeamIntegrating_button->isChecked())
 {
     total_fluence += fluence;
-    DoseInSilicone += 1.602e-8 * LET * fluence;
+    DoseInSilicone += 1.602e-8 * ui->doubleSpinBox_LET->value() * fluence;
  }
 else
 {
@@ -1306,7 +1212,7 @@ else
 
 if (ui->BeamReachDose_button->isChecked())
 {
-    AbsorbedDose+=1.602e-8 * LET * fluence;
+    AbsorbedDose+=1.602e-8 * ui->doubleSpinBox_LET->value() * fluence;
 
 }
 
@@ -1328,10 +1234,12 @@ if (AbsorbedDose>ui->spinBox_TargetDose->value())
     ui->label_Sil_dose->setText("Dose in silicon  [krad]  "+ QString::number(AbsorbedDose ));
 
 
+
+
 uint timestamp=QDateTime::currentDateTime().toTime_t();
     fprintf(log,"%d %d %d %e %e %e %e %e %e %e %d %d %d %d %d\n",
     timestamp,X_current, Y_current,
-    Current.toFloat(), flux, total_fluence, DoseInSilicone, ScaleCoeficient, CalibrationConstant, LET,ui->checkBox_Degrader_abs1->isChecked(),
+    Current.toFloat(), flux, total_fluence, DoseInSilicone, ScaleCoeficient, CalibrationConstant, ui->doubleSpinBox_LET->value(),ui->checkBox_Degrader_abs1->isChecked(),
     ui->checkBox_Degrader_05->isChecked(),ui->checkBox_Degrader_1->isChecked(),ui->checkBox_Degrader_2->isChecked(),ui->checkBox_Degrader_abs2->isChecked() );
 }
 
@@ -1567,10 +1475,6 @@ void MainWindow:: Draw_Scan_area()
 
 
    if (ScanArea_Max<Current.toDouble())    ScanArea_Max=Current.toDouble();
-
-
-
-
 
    ui->Scan_area->xAxis->setRange(ui->spinBox_ScanMin->value(), ui->spinBox_ScanMax->value());
 
