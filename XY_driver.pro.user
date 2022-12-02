@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE QtCreatorProject>
-<!-- Written by QtCreator 4.15.0, 2022-12-02T13:47:01. -->
+<!-- Written by QtCreator 4.15.0, 2022-12-02T14:19:55. -->
 <qtcreator>
  <data>
   <variable>EnvironmentId</variable>
@@ -297,8 +297,9 @@
     <valuelist type="QVariantList" key="CustomOutputParsers"/>
     <value type="int" key="PE.EnvironmentAspect.Base">2</value>
     <valuelist type="QVariantList" key="PE.EnvironmentAspect.Changes"/>
-    <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">Qt4ProjectManager.Qt4RunConfiguration:C:/Work/Work/Cyclotron/2021/XY_driver/XY_driver.pro</value>
-    <value type="QString" key="ProjectExplorer.RunConfiguration.BuildKey">C:/Work/Work/Cyclotron/2021/XY_driver/XY_driver.pro</value>
+    <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName">XY_driver2</value>
+    <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">Qt4ProjectManager.Qt4RunConfiguration:C:/Work/Work/Cyclotron/XY_Driver_working_directory/Dosimetry_system/XY_driver.pro</value>
+    <value type="QString" key="ProjectExplorer.RunConfiguration.BuildKey">C:/Work/Work/Cyclotron/XY_Driver_working_directory/Dosimetry_system/XY_driver.pro</value>
     <value type="bool" key="RunConfiguration.UseCppDebugger">false</value>
     <value type="bool" key="RunConfiguration.UseCppDebuggerAuto">true</value>
     <value type="bool" key="RunConfiguration.UseLibrarySearchPath">true</value>

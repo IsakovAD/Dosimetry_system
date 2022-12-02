@@ -21,8 +21,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     ui->setupUi(this);
     settings= new  SettingDialog ;
     connect(ui->actionSet_connection, &QAction::triggered, settings, &MainWindow::show);
-
-  //  fillPortsInfo();                //Fill names of avaible ports to combo boxes (can be used to get more information about serial devices)
     X_current=0,Y_current=0, Current= QByteArray::number(0);
 
 
@@ -119,19 +117,8 @@ ui->spinBox_MoveX_2->setMaximum(AXIS_RANGEX);
 ui->spinBox_MoveY_2->setMinimum(0);
 ui->spinBox_MoveY_2->setMaximum(AXIS_RANGEY);
 
-
-
-
-
-
-
-//ui->pushButton_CheckPosition->setDisabled(true);
-//ui->Move_button->setDisabled(true);
 ui->Move_button2->setDisabled(true);
 ui->Here_button->setDisabled(true);
-
-
-
 
 //All state labels is OFF (Red)
 ui->label_MCL_state->setStyleSheet("QLabel { background-color : red; }");
@@ -369,21 +356,6 @@ thread_New4->start();
      connect(COM_UNIDOS,SIGNAL(Port_state_changed(QSerialPort*,bool)),this,SLOT(Label_device_state(QSerialPort*,bool)));
 
      connect(settings,SIGNAL(Communication_settings_changed(int,QString,QString,QString)),this,SLOT(OPENCLOSE_ports(int,QString,QString,QString)));
-
-     /*
-     connect(ui->checkBox_COM_MCL, SIGNAL(clicked(bool)),this, SLOT(OpenClose_MCL(bool)));
-     connect(ui->checkBox_COM_Degrader, SIGNAL(clicked(bool)),this, SLOT(OpenClose_Degrader(bool)));
-     connect(ui->checkBox_COM_UNIDOS, SIGNAL(clicked(bool)),this, SLOT(OpenClose_UNIDOS(bool)));
-     */
-
- //---------------------------------experiments with scroll area
-
-//     ui->scrollArea->setWidget(ui->textBrowser);
-
-     //ui->scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-//     ui->scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-
-
      connect(COM_MCL,SIGNAL(NewDebugMSG(QString)),this,SLOT(WriteDebugMSG(QString)));
 
      connect(COM_UNIDOS,SIGNAL(NewDebugMSG(QString)),this,SLOT(WriteDebugMSG(QString)));
@@ -440,9 +412,8 @@ void MainWindow:: WriteDebugMSG(QString msg)
     DebugStr+=msg;
     ui->textBrowser->setText(DebugStr);
     QScrollBar *sb= ui->textBrowser->verticalScrollBar();
-
     sb->setValue(sb->maximum());
-
+    if (DebugStr.size() > 2000) DebugStr= ' ';
 }
 
 void MainWindow:: ResetGaus(){
@@ -499,8 +470,6 @@ void MainWindow:: FitGaus(){
                 max_coordinate=i;
             }
         }
-       ScanArea_Max=max; //AID 06_05 DELETE THIS LATER
-
         expected_amp=Graph_Current[max_coordinate];
         expected_mean=Graph_Coordinate[max_coordinate];
 
@@ -777,7 +746,6 @@ void MainWindow:: BeamScanSetup(void){
             expected_sigma=0;
 
             ScanArea_Max=1e-15; //AID!!!!!!!!
-          //  ScanArea_Max=0; //AID!!!!!!!!
 
             ui->label_ScaningState->setStyleSheet("QLabel { font-size: 11pt;font-weight: bold;}");
             ui->label_ScaningState->setAlignment(Qt::AlignCenter);
@@ -809,17 +777,6 @@ void MainWindow:: SaveFit(){
          stream << expected_amp<<"; "<<expected_mean<<"; "<<expected_sigma<<"; "<<GausScale << endl;
      }
 
-
-     //FILE *FitScan;
-   // FitScan=fopen(FileName.toLatin1(),"w");
-
-    //if (FitScan==NULL)
-      // WriteDebugMSG("error in opening file");
-
-    //fprintf(FitScan,"%f %f %f %f",expected_amp,expected_mean,expected_sigma,GausScale);
-
-  //  fclose(FitScan);
-  //  qDebug("I`ve saved Fit");
 }
 
 void MainWindow:: PortConnectionError(void)
@@ -851,7 +808,7 @@ void MainWindow:: MotorMovingError(bool state)
     {
         ui->label_error_state_3->setStyleSheet("QLabel { background-color : none;}");
         ui->label_error_state_3->setAlignment(Qt::AlignCenter);
-        ui->label_error_state_3->setText("Motor D");
+        ui->label_error_state_3->setText("Motor STOP");
 
     }
 
@@ -1035,11 +992,11 @@ void  MainWindow:: Start_timer(bool state){
         DoseInSilicone =0;
         ui->Monitoring_area->graph(0)->clearData();
 
-        QString FileName=DirName+ "\\LOG_"+QString::number(QDateTime::currentDateTime().toTime_t())+".txt";
+
         // std:: string FileName= "LOG_"+QDateTime::currentDateTime().toTime_t()+".txt";
-        qDebug()<<" I will open file: "<<FileName;
-         log=fopen(FileName.toLatin1(),"w");
-         if (log == NULL)  WriteDebugMSG("Error in opening LOG file");
+        LogFileName=DirName+ "\\LOG_"+QString::number(QDateTime::currentDateTime().toTime_t())+".txt";
+
+
 
 
         this->timestamp_begin=QDateTime::currentDateTime().toTime_t();
@@ -1056,10 +1013,9 @@ void  MainWindow:: Start_timer(bool state){
     else
     {
         qDebug("Button is toggled False");
-         fclose(log);
+
      ui->BeamMonitoring_button->setText("Start Beam Monitoring");
        timer->stop();
-       //timeToIntegrateDose->;
         MonitoringArea_Max=1e-15;
 
        ui->BeamReachDose_button->setChecked(false);
@@ -1120,6 +1076,8 @@ void  MainWindow:: Start_ReachDose(bool state){
 }
 
 void MainWindow:: WriteLogFile (){
+
+
 
     if (!ScanState){ //possible strange interaction when we have no connection
 
@@ -1210,10 +1168,13 @@ void MainWindow:: WriteLogFile (){
 
 
     uint timestamp=QDateTime::currentDateTime().toTime_t();
+    log=fopen(LogFileName.toLatin1(),"a");
+    if (log == NULL)  WriteDebugMSG("Error in opening LOG file");
     fprintf(log,"%d %d %d %e %e %e %e %e %e %e %d %d %d %d %d\n",
     timestamp,X_current, Y_current,
     Current.toFloat(), flux, total_fluence, DoseInSilicone, ScaleCoeficient, CalibrationConstant, LET,ui->checkBox_Degrader_abs1->isChecked(),
     ui->checkBox_Degrader_05->isChecked(),ui->checkBox_Degrader_1->isChecked(),ui->checkBox_Degrader_2->isChecked(),ui->checkBox_Degrader_abs2->isChecked() );
+    fclose(log);
 }
 
 
@@ -1439,51 +1400,10 @@ void MainWindow:: Draw_Scan_area()
 
 
    if (ScanArea_Max<Current.toDouble())    ScanArea_Max=Current.toDouble();
-   // aid 14.11.2021 ui->Scan_area->xAxis->setRange(ui->spinBox_ScanMin->value(), ui->spinBox_ScanMax->value());
-   ui->Scan_area->xAxis->setRange(150, 260);
-
-
-/*
- if (ui->AxisX_Button->isChecked())
-      // ui->Scan_area->graph(0)->addData(X_current, Current.toFloat());
-     ui->Scan_area->graph(0)->addData(X_current, Current.toDouble());
- else
-     ui->Scan_area->graph(0)->addData(Y_current,  Current.toDouble());
-
-*/
-
-
-  // ui->Scan_area->graph(0)->clearData();
-   float Graph_Coordinate[18]= {160,		165	,		175		,	180	,	185,		190,		195	,	200,		205	,	210,		215	,	220,		225		,230,		235	,	240,		245,		250};
-   float Graph_Current[18]= { 4.410000e-013,		7.010000e-013,			1.010000e-012	,		1.981000e-012,		2.629000e-012	,	3.265000e-012	,	3.886000e-012	,	4.433000e-012	,	4.660000e-012	,	4.733000e-012	,	4.501000e-012	,	3.973000e-012	,	3.507000e-012	,	2.832000e-012	,	2.097000e-012	,	1.576000e-012	,	1.127000e-012,		7.970000e-013};
-
- //  float Graph_Current[21]={1.090000e-009,	1.260000e-009,	1.370000e-009	,1.490000e-009,	1.570000e-009,	1.730000e-009,	1.800000e-009,	1.930000e-009,	2.050000e-009,	2.120000e-009,	2.180000e-009,	2.170000e-009	,2.300000e-009,	2.160000e-009,	2.210000e-009,	2.180000e-009,	2.090000e-009,	2.010000e-009,	1.830000e-009,	1.740000e-009	,1.620000e-009};
-  //float Graph_Current[21]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-//  float Graph_Coordinate[9]={150,	155, 160,165,170,175,180,185,190};
-  //float Graph_Coordinate[9]={0,	10, 20,30,40,50,60,70,80};
- //float Graph_Current[9]={6.468000e-010	,		8.341000e-010	,		9.094000e-010,			8.345000e-010		,	6.340000e-010	,		3.874000e-010	,		2.003000e-010};
-  //float Graph_Coordinate[21]={0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100};
-   //float Graph_Coordinate[11]={0,3,6,9,12,15,18,21,24,27,30};
-
-
-  for (int i=0;i<18;i++)
-  {
-       //  ui->Scan_area->graph(0)->addData(Graph_Coordinate[i], Graph_Current[i]*pow(10,9));
-       // if (ScanArea_Max<Graph_Current[i]*pow(10,9))    ScanArea_Max=Graph_Current[i]*pow(10,9);
-       ui->Scan_area->graph(0)->addData(Graph_Coordinate[i], Graph_Current[i]);
-      if (ScanArea_Max<Graph_Current[i])    ScanArea_Max=Graph_Current[i];
-  }
-
-
-
-
-
-   // X_current++;
-//------------------------------------------------------------COrrect
-
+   ui->Scan_area->xAxis->setRange(ui->spinBox_ScanMin->value(), ui->spinBox_ScanMax->value());
 
    //antialiased doesn't have sense, main idea to detect, that graph is filled (to avoid additional last point)
-/* AID 14.11.2022
+
 if (ui->Scan_area->graph(1)->antialiased())
 {
    if (ui->AxisX_Button->isChecked())
@@ -1492,9 +1412,8 @@ if (ui->Scan_area->graph(1)->antialiased())
        ui->Scan_area->graph(0)->addData(Y_current,  Current.toDouble());
   }
 
-*/
+
 //-----------------------------------------------------------
-  //ui->Scan_area->graph(0)->addData(X_current, Current.toDouble());
 
 
 
