@@ -9,7 +9,7 @@
 #include "settingdialog.h"
 #include "qmessagebox"
 #include "qcloseevent"
-
+#include <QElapsedTimer>
 
 static const char blankString[] = QT_TRANSLATE_NOOP("SettingsDialog", "N/A");
 
@@ -42,7 +42,7 @@ ui->checkBox_ReadyX->setEnabled(false);
 ui->checkBox_ReadyY->setEnabled(false);
 
 //parameters for calculation dose
-limit_range_random=20; //AID 06_05
+limit_range_random=10; //AID 06_05
 CalibrationConstant=0;
 pEnergyAtSample=0;
 LET=0;
@@ -177,7 +177,7 @@ ui->Info_label_2->setText("Gaus Amplitude [nA] " + QString::number(expected_amp)
 
     timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(WriteLogFile()));  //Calculate all radiation parameters and write it to log file
-
+    connect(ui->spinBox_Period,SIGNAL(valueChanged(int)),this,SLOT(ChangeTimerPeriod(int)));
 
 
 
@@ -195,7 +195,7 @@ ui->Info_label_2->setText("Gaus Amplitude [nA] " + QString::number(expected_amp)
     ui->Scan_area->addGraph();
      ui->Scan_area->addGraph();
     ui->Scan_area->axisRect()->setupFullAxesBox();
-   // Draw_Scan_area();
+    Draw_Scan_area();
 
 
 //-----COM_MCL------------------------------------------------
@@ -225,7 +225,7 @@ ui->Info_label_2->setText("Gaus Amplitude [nA] " + QString::number(expected_amp)
      connect(ui->Move_button2,SIGNAL(clicked(bool)),this,SLOT(ReadNEWCoordinate_Move2()));
      connect(ui->pushButton_CheckPosition,SIGNAL(clicked(bool)),COM_MCL,SLOT(UpdateCoordinates()));
     connect(ui->pushButton_ClrError,SIGNAL(clicked(bool)), COM_MCL,SLOT(ClearPositionError()));
-
+    connect(ui->doubleSpinBox_LET,SIGNAL(valueChanged(double)),this,SLOT(UpdateLET(double)));
 
 
 
@@ -248,6 +248,7 @@ ui->Info_label_2->setText("Gaus Amplitude [nA] " + QString::number(expected_amp)
     connect(this,SIGNAL(StartCalibration()),COM_MCL,SLOT(Calibration()));
     connect(COM_MCL,SIGNAL(MotorStat(bool)),this,SLOT(MotorMovingError(bool)));
      connect(ui->FtGaus_button,SIGNAL(clicked(bool)),this,SLOT(FitGaus()));
+     connect(ui->Res_Gaus_button,SIGNAL(clicked(bool)),this,SLOT(ResetGaus()));
 
      connect(this,SIGNAL(MoveTo(int,int)),COM_MCL,SLOT(MOVE_MCL(int,int)));
 
@@ -401,6 +402,16 @@ thread_New4->start();
 
 }
 
+void MainWindow::UpdateLET(double input){
+      LET=input;
+      qDebug()<<"New LET value from spinbox:" << LET;
+}
+
+void MainWindow::ChangeTimerPeriod(int time){
+      timer->stop();
+      timer->start(ui->spinBox_Period->value()*1000);
+
+}
 
 
 void MainWindow::ShowDebug(bool state)
@@ -434,16 +445,30 @@ void MainWindow:: WriteDebugMSG(QString msg)
 
 }
 
+void MainWindow:: ResetGaus(){
+
+    const QCPDataMap *dataMap= ui->Scan_area->graph(0)->data();
+    if (dataMap->empty()){
+        WriteDebugMSG("No data scan found, nothing to reset \n");
+        return;
+   }
+
+    limit_range_random = 10;
+    ui->Scan_area->graph(1)->clearData();
+    expected_amp=0;
+    expected_mean=0;
+    expected_sigma=0;
+    ui->Info_label_2->setText("Gaus Amplitude [nA] " + QString::number(expected_amp) +  "\n \n Gaus Mean [mm] " + QString::number(expected_mean)+ "\n \n Gaus Sigma [mm] " + QString::number(expected_sigma) +  "\n \n Scale (approx.) " + QString::number(0));
+    Draw_Scan_area();
+}
 
 void MainWindow:: FitGaus(){
 
     float max=0,temp=0;
     int max_coordinate;
     const QCPDataMap *dataMap= ui->Scan_area->graph(0)->data();
-
-
     if (dataMap->empty()){
-        WriteDebugMSG("No Scan found");
+        WriteDebugMSG("No Scan found \n");
         return;
     }
 
@@ -459,22 +484,22 @@ void MainWindow:: FitGaus(){
     }
 
 
+
     qsrand(QDateTime::currentMSecsSinceEpoch());
     float fit_ampl[8]={18,19,20,20,0,0,0,0};
     float fit_mean[8]={48,50,52,49,0,0,0,0};
     float fit_sigma[8]={40,50,45,55,0,0,0,0};
 
 
-    if (limit_range_random==20){
+    if (expected_amp==0 && expected_mean==0 && expected_sigma==0){
 
-     // First predictions of parameters, "limit_range_random==20" means that we first time here
         for (int i=0;i<size;i++){
             if (Graph_Current[i]>max){
                 max= Graph_Current[i];
                 max_coordinate=i;
             }
         }
-        ScanArea_Max=max; //AID 06_05 DELETE THIS LATER
+       ScanArea_Max=max; //AID 06_05 DELETE THIS LATER
 
         expected_amp=Graph_Current[max_coordinate];
         expected_mean=Graph_Coordinate[max_coordinate];
@@ -495,32 +520,28 @@ void MainWindow:: FitGaus(){
        }
 
        expected_sigma=(second-first)/2.355;
-       //WriteDebugMSG("Expected Sigma "+ QString::number(expected_sigma)+ " amp "+ QString::number(expected_amp)+" mean "+ QString::number(expected_mean) );
+       WriteDebugMSG("Expected Sigma "+ QString::number(expected_sigma)+ " amp "+ QString::number(expected_amp)+" mean "+ QString::number(expected_mean) );
 
     }
 
      //we need to have 4 random values of parameters. amplitude is always fixed
      for (int i=0;i<4;i++){
-         int sign_mean;
-         int sign_sigma;
+        // qsrand(static_cast<quint64>(QTime::currentTime().msecsSinceStartOfDay())+i);
 
-         if (i%2==1) sign_mean=1;
-         else sign_mean=-1;
+         int sigma_rnd =  qrand();
+         int mean_rnd =qrand();
 
-         if (i<2) sign_sigma=1;
-         else sign_sigma=-1;
+         fit_ampl[i]=expected_amp+expected_amp*(qrand() % 3 -1)/100;// 3%
+         fit_sigma[i]=expected_sigma+expected_sigma*(sigma_rnd % 11 -5)/100.; // 5%
+         fit_mean[i]=expected_mean+4.*mean_rnd/RAND_MAX - 2; // 2 mm
 
-
-         fit_ampl[i]=expected_amp;
-
-         fit_sigma[i]=expected_sigma  + sign_mean* fabs(expected_sigma*((qrand() % limit_range_random -(int) limit_range_random/2))/100);
-         fit_mean[i]=expected_mean  +  sign_sigma* fabs(expected_mean*((qrand() % limit_range_random -(int) limit_range_random/2))/100);
-
-         //WriteDebugMSG("RandomUpdates: fit_sigma[i]: "+ QString::number(fit_sigma[i]-expected_sigma) + " fit_mean "+QString::number(fit_mean[i]-expected_mean) +"\n"  );
+         //WriteDebugMSG("sigma_rnd "+ QString::number(sigma_rnd) + " mean_rnd "+QString::number(mean_rnd) +"\n"  );
+         //WriteDebugMSG("sigma variation "+ QString::number((sigma_rnd % 11 -5)/100.) + " mean variation "+QString::number(4.*mean_rnd/RAND_MAX - 2) +"\n"  );
+         //WriteDebugMSG("fit_sigma[i]: "+ QString::number(fit_sigma[i]-expected_sigma) + " fit_mean "+QString::number(fit_mean[i]-expected_mean) +"\n"  );
 
      }
 
-    if (limit_range_random>10) limit_range_random--;  //aid 6Feb_2020
+    if (limit_range_random>5) limit_range_random--;  //aid 6Feb_2020
     float k=0, e=0.01, alpha=1, beta=0.5, gamma=2.9,sum=0;
 
     while (k<50){
@@ -705,29 +726,7 @@ void MainWindow:: OPENCLOSE_ports(int state,QString MCL_name,QString Degrader_na
     }
 
 }
-/*
-void MainWindow:: OpenClose_MCL(bool state){
 
-
-    emit RunMCL(state, ui->comboBox_MCL->currentText().split(':')[0]);
-
-
-}
-
-void MainWindow:: OpenClose_UNIDOS(bool state){
-
-    emit RunUNIDOS(state, ui->comboBox_UNIDOS->currentText().split(':')[0]);
-
-
-}
-
-void MainWindow:: OpenClose_Degrader(bool state){
-
-    emit RunDegrader(state, ui->comboBox_Degrader->currentText().split(':')[0]);
-
-
-}
-*/
 
 void MainWindow:: SetupScanRange()
 {
@@ -762,7 +761,7 @@ void MainWindow:: BeamScanState(void)
     ScanState=0;
     ui->label_ScaningState->setStyleSheet("QLabel { font-size: 11pt;font-weight: bold;}");
      ui->label_ScaningState->setAlignment(Qt::AlignCenter);
-        ui->label_ScaningState->setText("Scanning stopped");
+        ui->label_ScaningState->setText("Stopped");
 
 }
 void MainWindow:: BeamScanSetup(void){
@@ -773,13 +772,16 @@ void MainWindow:: BeamScanSetup(void){
             ui->Scan_area->graph(0)->clearData();
             ui->Scan_area->graph(1)->clearData();
             ui->Scan_area->graph(1)->setAntialiased(true);
-            limit_range_random=20; //aid 6Feb_2020
+            expected_amp=0;
+            expected_mean=0;
+            expected_sigma=0;
+
             ScanArea_Max=1e-15; //AID!!!!!!!!
-           // ScanArea_Max=0; //AID!!!!!!!!
+          //  ScanArea_Max=0; //AID!!!!!!!!
 
             ui->label_ScaningState->setStyleSheet("QLabel { font-size: 11pt;font-weight: bold;}");
             ui->label_ScaningState->setAlignment(Qt::AlignCenter);
-            ui->label_ScaningState->setText("On Going");
+            ui->label_ScaningState->setText("Ongoing");
             ScanState=1;
             emit BeamScanRun(ui->AxisX_Button->isChecked(),ui->spinBox_ScanMin->value(),ui->spinBox_ScanMax->value(),ui->spinBox_Step->value(),ui->spinBox_FixPosition->value());
             //  ui->AxisX_Button->isChecked(),ui->spinBox_ScanMin->value(),ui->spinBox_ScanMax->value(),ui->spinBox_Step->value());
@@ -849,7 +851,7 @@ void MainWindow:: MotorMovingError(bool state)
     {
         ui->label_error_state_3->setStyleSheet("QLabel { background-color : none;}");
         ui->label_error_state_3->setAlignment(Qt::AlignCenter);
-        ui->label_error_state_3->setText("Motor STOPPED");
+        ui->label_error_state_3->setText("Motor D");
 
     }
 
@@ -1044,7 +1046,7 @@ void  MainWindow:: Start_timer(bool state){
 
 
            timer->start(ui->spinBox_Period->value()*1000);
-
+           timeToIntegrateDose->start();
          ui->label_monitoring_state->setStyleSheet("QLabel { background-color : yellow; font-size: 11pt;font-weight: bold;}");
          ui->label_monitoring_state->setText("MONITORING ON");
          qDebug("Button is toggled true");
@@ -1057,6 +1059,7 @@ void  MainWindow:: Start_timer(bool state){
          fclose(log);
      ui->BeamMonitoring_button->setText("Start Beam Monitoring");
        timer->stop();
+       //timeToIntegrateDose->;
         MonitoringArea_Max=1e-15;
 
        ui->BeamReachDose_button->setChecked(false);
@@ -1093,6 +1096,7 @@ void  MainWindow:: Start_integration(bool state){
         ui->BeamIntegrating_button->setText("START Integration");
         RefreshState=false;
 
+
     }
     else
     {
@@ -1115,115 +1119,84 @@ void  MainWindow:: Start_ReachDose(bool state){
     }
 }
 
-void MainWindow:: WriteLogFile(){
+void MainWindow:: WriteLogFile (){
 
+    if (!ScanState){ //possible strange interaction when we have no connection
 
-    if (!ScanState)
-
-{
+       //QElapsedTimer timer_UnidosReply;
+       //timer_UnidosReply.start();
         emit RunUNIDOS();
-
         QTimer * WaitTimer = new QTimer(this);
         WaitTimer->setSingleShot(true);
         WaitTimer->start(1000);
-
-        while (!CurrentUpdated)
-        {
-              if (WaitTimer->remainingTime() ==0)
-                {
-                  WriteDebugMSG("Too long wait UNIDOS \n");
-                  return;
-                }
-
+        while (!CurrentUpdated){
+           if (WaitTimer->remainingTime() ==0){
+              WriteDebugMSG("Too long wait UNIDOS, return from WriteLogFile \n");
+              return;
+           }
         }
         delete(WaitTimer);
-
-}
-
-
+        //WriteDebugMSG(" normal operation answer time: " + QString::number(timer_UnidosReply.elapsed())+ "\n");
+     }
 
 
 
 
 
+    CurrentUpdated=0;
+    Draw_Monitoring_area();
 
-CurrentUpdated=0;
-//qDebug("Draw Monitoring area \n");
-Draw_Monitoring_area();
+    //timer->start(ui->spinBox_Period->value()*1000); //AID 25-06-21 IMPORTNAT CHANGE, before it was ON
 
-    timer->start(ui->spinBox_Period->value()*1000);
-
-    // Draw_MCL_area(X_max,Y_max, X_current,Y_current);
-
-
-
-    //emit RunMCL();
     float avr_current=0, avr_flux=0;
 
-    //qDebug("Number of graphs in monitoring area %d",ui->Monitoring_area->selectedGraphs().count());
-    //if(ui->Monitoring_area->selectedGraphs().count() != 0 )
-     const QCPDataMap *dataMap = ui->Monitoring_area->graph(0)->data();
+    const QCPDataMap *dataMap = ui->Monitoring_area->graph(0)->data();
     Draw_Monitoring_area();
-    // qDebug("Size of graph in monitoring aread %d",dataMap->size());
     ScaleCoeficient=ui->ScaleSpinBox->value();
 
 
 
- //Calculation of the average values of current and flux
- flux= ScaleCoeficient* CalibrationConstant*(1e12)* Current.toFloat()* (int)(!ui->checkBox_Degrader_abs2->isChecked());
-if (flux<0) flux=0;
+    //Calculation of the average values of current and flux
+    flux= ScaleCoeficient* CalibrationConstant*(1e12)* Current.toFloat()* (int)(!ui->checkBox_Degrader_abs2->isChecked());
+    if (flux<0) flux=0;
 
-     if (dataMap->size() > ui->spinBox_Avr_range->value())
-     {
-         avr_current=0;
-         avr_flux=0;
-             QMap<double, QCPData>::const_iterator i = dataMap->constEnd();
-        i--;
-          //   qDebug("------------------");
-             for (int j=0;j<ui->spinBox_Avr_range->value();j++,i--)
-             {
+    if (dataMap->size() > ui->spinBox_Avr_range->value()){
+       avr_current=0;
+       avr_flux=0;
+       QMap<double, QCPData>::const_iterator i = dataMap->constEnd();
+       i--;
+       for (int j=0;j<ui->spinBox_Avr_range->value();j++,i--){
 
-               avr_current+=i.value().value*(1e12);
-               avr_flux+=ScaleCoeficient* CalibrationConstant*(1e12)* i.value().value*(int)(!ui->checkBox_Degrader_abs2->isChecked());
-
-
-              }
+          avr_current+=i.value().value*(1e12);
+          avr_flux+=ScaleCoeficient* CalibrationConstant*(1e12)* i.value().value*(int)(!ui->checkBox_Degrader_abs2->isChecked());
+       }
     }
 
    avr_current/=ui->spinBox_Avr_range->value();
    avr_flux/=ui->spinBox_Avr_range->value();
-   fluence = flux*ui->spinBox_Period->value();
+
+   int ms_integrate=timeToIntegrateDose->elapsed();
+   //WriteDebugMSG("time to integrate: " + QString::number(ms_integrate)+ "\n");
+   // fluence = flux*ui->spinBox_Period->value(); //IMPORTANT change, before we were using spinBox value!!!!
+   fluence = flux*ms_integrate/1000.;
+   timeToIntegrateDose->restart();
 
 
+   if (ui->BeamIntegrating_button->isChecked()){
+      total_fluence += fluence;
+      DoseInSilicone += 1.602e-8 * LET * fluence;
+   } else {
+      total_fluence = 0;
+      DoseInSilicone = 0;
+   }
+
+   if (ui->BeamReachDose_button->isChecked()) AbsorbedDose+=1.602e-8 * LET * fluence;
 
 
-
-if (ui->BeamIntegrating_button->isChecked())
-{
-    total_fluence += fluence;
-    DoseInSilicone += 1.602e-8 * ui->doubleSpinBox_LET->value() * fluence;
- }
-else
-{
-    total_fluence = 0;
-    DoseInSilicone = 0;
-}
-
-
-if (ui->BeamReachDose_button->isChecked())
-{
-    AbsorbedDose+=1.602e-8 * ui->doubleSpinBox_LET->value() * fluence;
-
-}
-
-if (AbsorbedDose>ui->spinBox_TargetDose->value())
-{
-    ui->BeamMonitoring_button->setChecked(false);
-    ui->checkBox_Degrader_abs1->setChecked(true);
-}
-
-
-
+   if (AbsorbedDose>ui->spinBox_TargetDose->value()){  //does it really work?
+       ui->BeamMonitoring_button->setChecked(false);
+       ui->checkBox_Degrader_abs1->setChecked(true);
+   }
 
 
 
@@ -1236,23 +1209,14 @@ if (AbsorbedDose>ui->spinBox_TargetDose->value())
 
 
 
-uint timestamp=QDateTime::currentDateTime().toTime_t();
+    uint timestamp=QDateTime::currentDateTime().toTime_t();
     fprintf(log,"%d %d %d %e %e %e %e %e %e %e %d %d %d %d %d\n",
     timestamp,X_current, Y_current,
-    Current.toFloat(), flux, total_fluence, DoseInSilicone, ScaleCoeficient, CalibrationConstant, ui->doubleSpinBox_LET->value(),ui->checkBox_Degrader_abs1->isChecked(),
+    Current.toFloat(), flux, total_fluence, DoseInSilicone, ScaleCoeficient, CalibrationConstant, LET,ui->checkBox_Degrader_abs1->isChecked(),
     ui->checkBox_Degrader_05->isChecked(),ui->checkBox_Degrader_1->isChecked(),ui->checkBox_Degrader_2->isChecked(),ui->checkBox_Degrader_abs2->isChecked() );
 }
 
 
-
-
-
-void MainWindow:: showDataMessage(QByteArray &data){
-
-  //  ui->line_COM2_2->setText(QString::number( myTimer.elapsed()));
-    //ui->line_COM2->setText(data);
-
-}
 void MainWindow:: CalibrationProceed(bool state)
 {
 
@@ -1296,7 +1260,7 @@ void MainWindow:: WriteCurrentCoordinate(int x,int y){
     Draw_MCL_area(X_current,Y_current);
     CoordinateUpdated=true; //needs for SCANNING
 
-  //  MotorMovingError(false); //SET label "Motor is STOPPED"
+  //  MotorMovingError(false); //SET label "Motor is D"
 
      emit Main_CoordinateUpdated();
 }
@@ -1448,7 +1412,7 @@ void MainWindow:: Draw_MCL_area(int X_current, int Y_current){
 void MainWindow:: Draw_Scan_area()
 {
 
-  //  qDebug("Start Drawing Scan area");
+    qDebug("Start Drawing Scan area");
     ui->Scan_area->setInteraction(QCP::iRangeZoom,true);
     ui->Scan_area->axisRect()->setRangeZoom(Qt::Vertical);
 
@@ -1475,8 +1439,9 @@ void MainWindow:: Draw_Scan_area()
 
 
    if (ScanArea_Max<Current.toDouble())    ScanArea_Max=Current.toDouble();
+   // aid 14.11.2021 ui->Scan_area->xAxis->setRange(ui->spinBox_ScanMin->value(), ui->spinBox_ScanMax->value());
+   ui->Scan_area->xAxis->setRange(150, 260);
 
-   ui->Scan_area->xAxis->setRange(ui->spinBox_ScanMin->value(), ui->spinBox_ScanMax->value());
 
 /*
  if (ui->AxisX_Button->isChecked())
@@ -1489,24 +1454,26 @@ void MainWindow:: Draw_Scan_area()
 
 
   // ui->Scan_area->graph(0)->clearData();
-  // float Graph_Coordinate[18]= {160,		165	,		175		,	180	,	185,		190,		195	,	200,		205	,	210,		215	,	220,		225		,230,		235	,	240,		245,		250};
-  // float Graph_Current[18]= { 4.410000e-013,		7.010000e-013,			1.010000e-012	,		1.981000e-012,		2.629000e-012	,	3.265000e-012	,	3.886000e-012	,	4.433000e-012	,	4.660000e-012	,	4.733000e-012	,	4.501000e-012	,	3.973000e-012	,	3.507000e-012	,	2.832000e-012	,	2.097000e-012	,	1.576000e-012	,	1.127000e-012,		7.970000e-013};
+   float Graph_Coordinate[18]= {160,		165	,		175		,	180	,	185,		190,		195	,	200,		205	,	210,		215	,	220,		225		,230,		235	,	240,		245,		250};
+   float Graph_Current[18]= { 4.410000e-013,		7.010000e-013,			1.010000e-012	,		1.981000e-012,		2.629000e-012	,	3.265000e-012	,	3.886000e-012	,	4.433000e-012	,	4.660000e-012	,	4.733000e-012	,	4.501000e-012	,	3.973000e-012	,	3.507000e-012	,	2.832000e-012	,	2.097000e-012	,	1.576000e-012	,	1.127000e-012,		7.970000e-013};
 
-  // float Graph_Current[21]={1.090000e-009,	1.260000e-009,	1.370000e-009	,1.490000e-009,	1.570000e-009,	1.730000e-009,	1.800000e-009,	1.930000e-009,	2.050000e-009,	2.120000e-009,	2.180000e-009,	2.170000e-009	,2.300000e-009,	2.160000e-009,	2.210000e-009,	2.180000e-009,	2.090000e-009,	2.010000e-009,	1.830000e-009,	1.740000e-009	,1.620000e-009};
+ //  float Graph_Current[21]={1.090000e-009,	1.260000e-009,	1.370000e-009	,1.490000e-009,	1.570000e-009,	1.730000e-009,	1.800000e-009,	1.930000e-009,	2.050000e-009,	2.120000e-009,	2.180000e-009,	2.170000e-009	,2.300000e-009,	2.160000e-009,	2.210000e-009,	2.180000e-009,	2.090000e-009,	2.010000e-009,	1.830000e-009,	1.740000e-009	,1.620000e-009};
   //float Graph_Current[21]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-//float Graph_Coordinate[9]={150,	155, 160,165,170,175,180,185,190};
-//float Graph_Current[9]={6.468000e-010	,		8.341000e-010	,		9.094000e-010,			8.345000e-010		,	6.340000e-010	,		3.874000e-010	,		2.003000e-010};
- // float Graph_Coordinate[21]={0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100};
+//  float Graph_Coordinate[9]={150,	155, 160,165,170,175,180,185,190};
+  //float Graph_Coordinate[9]={0,	10, 20,30,40,50,60,70,80};
+ //float Graph_Current[9]={6.468000e-010	,		8.341000e-010	,		9.094000e-010,			8.345000e-010		,	6.340000e-010	,		3.874000e-010	,		2.003000e-010};
+  //float Graph_Coordinate[21]={0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,100};
    //float Graph_Coordinate[11]={0,3,6,9,12,15,18,21,24,27,30};
-/*
-  for (int i=0;i<9;i++)
+
+
+  for (int i=0;i<18;i++)
   {
        //  ui->Scan_area->graph(0)->addData(Graph_Coordinate[i], Graph_Current[i]*pow(10,9));
        // if (ScanArea_Max<Graph_Current[i]*pow(10,9))    ScanArea_Max=Graph_Current[i]*pow(10,9);
        ui->Scan_area->graph(0)->addData(Graph_Coordinate[i], Graph_Current[i]);
       if (ScanArea_Max<Graph_Current[i])    ScanArea_Max=Graph_Current[i];
   }
-*/
+
 
 
 
@@ -1516,6 +1483,7 @@ void MainWindow:: Draw_Scan_area()
 
 
    //antialiased doesn't have sense, main idea to detect, that graph is filled (to avoid additional last point)
+/* AID 14.11.2022
 if (ui->Scan_area->graph(1)->antialiased())
 {
    if (ui->AxisX_Button->isChecked())
@@ -1523,6 +1491,8 @@ if (ui->Scan_area->graph(1)->antialiased())
    else
        ui->Scan_area->graph(0)->addData(Y_current,  Current.toDouble());
   }
+
+*/
 //-----------------------------------------------------------
   //ui->Scan_area->graph(0)->addData(X_current, Current.toDouble());
 

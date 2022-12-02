@@ -69,7 +69,6 @@ signals:
     void CalibrationDone(bool);
     void Nanotec_state(bool,bool,bool,bool,bool,bool);
 
-
     void Time_pass(QByteArray &data);
     void outPort(QByteArray &data);
     bool StartComandTransferForMCL(QByteArray, QString);
@@ -179,6 +178,7 @@ public:
 
     QByteArray Current;
     QTimer *timer;
+    QElapsedTimer  *timeToIntegrateDose;
     bool CurrentUpdated=false, CoordinateUpdated=false, RefreshState=true;
  //void fillPortsInfo();
 
@@ -194,6 +194,8 @@ private slots:
 // void OpenClose_MCL(bool);
 // void OpenClose_UNIDOS(bool);
 // void OpenClose_Degrader(bool);
+    void UpdateLET(double);
+    void ChangeTimerPeriod(int);
     void SetupCalibration(void);
     void PortConnectionError(void);
     void LimitSwitchError(void);
@@ -215,10 +217,10 @@ private slots:
      void ReadNEWCoordinate_Move2 (void);
       void Draw_Scan_area(void);
    //  void MoveDegrader(void);
-     void showDataMessage(QByteArray &data);
      void BeamScanSetup(void);
      void SaveFit(void);
      void FitGaus(void);
+     void ResetGaus(void);
      void CalcBeamParams(void);
      void Label_device_state(QSerialPort *thisPort, bool state);
      void WriteDebugMSG(QString);
