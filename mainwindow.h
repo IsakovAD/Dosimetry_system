@@ -175,7 +175,7 @@ public:
     int X_current,Y_current,limit_range_random=6, ConnectionState=0, ScanState=0;
     int PositionErrorState;
     QString MCL_port_name="COM1",Degrader_port_name="COM2",UNIDOS_port_name="COM3", DebugStr;
-
+    QString LogFileName;
     QByteArray Current;
     QTimer *timer;
     QElapsedTimer  *timeToIntegrateDose;
